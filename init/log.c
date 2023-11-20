@@ -28,6 +28,8 @@ int print(const char *fmt, ...)
         fmt += 2;
     }
 
+    /* we essentially print the user's raw input to its own buffer,
+       later we will parse it and print out ANSI colors and what not */
     char buf[512];
 
     va_list ap;
@@ -42,13 +44,20 @@ int print(const char *fmt, ...)
             break;
     }
 
-    /* spin lock, at the cost of architecture portability */
+    /* spin lock, at the cost of architecture portability
+       concurrency is something that we need to adjust for, and the
+       console will be scrambled and unreadable if we allow writing all
+       at the same time. I considered simply writing all at once, but
+       ended up just not caring enough to the point where spinlocks
+       prevail. */
     __asm__(".spin_lock:");
     __asm__("mov rax, 1");
     __asm__("xchg rax, [console_lock]");
     __asm__("test rax, rax");
     __asm__("jnz .spin_lock");
 
+    /* we want to support stuff without colons, but frankly I havent
+       tested this at time of writing. will find out later */
     if(buf[colon] == ':') {
         writeputs(ANSI_RESET);
         writeputs(colors[loglevel]);
@@ -63,6 +72,7 @@ int print(const char *fmt, ...)
         writeputs(buf);
     }
     writeputs(ANSI_RESET);
+    write(STDOUT_FILENO, "\n", 1);
 
     console_lock = 0;
     return 0;

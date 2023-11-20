@@ -1,7 +1,7 @@
 #ifndef __INIT_H
 #define __INIT_H
 
-typedef int (*initcall_t)(void);
+typedef void (*initcall_t)(void);
 typedef initcall_t initcall_entry_t;
 
 #define __define_initcall(fn, id) \

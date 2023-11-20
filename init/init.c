@@ -10,6 +10,10 @@
 static unsigned long __1bsafebuf
     __attribute__((used)) __attribute__((section(".1bsafebuf.init"))) = 0;
 
+/* We start initcall levels at [1] instead of [0], so we must adjust
+   in code for this minor design choice. Math is done on the level passed
+   through i.e. do_initcall_level so that you can call it with (1) and have
+   the expected initcall (l1_initcall) run. */
 extern initcall_entry_t __initcall1_start[];
 extern initcall_entry_t __initcall2_start[];
 extern initcall_entry_t __initcall3_start[];
@@ -46,6 +50,9 @@ int main(void)
 {
     do_initcalls();
 
+    /* Reaper. Much like init. */
+    // BUG: doesnt actually work?? we have defunct processes still
+    // TODO: fix bug
     static sigset_t set;
     sigaddset(&set, SIGCHLD);
     sigprocmask(SIG_BLOCK, &set, NULL);

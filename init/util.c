@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* thank you suckless team (see libsl) */
 void die(const char *fmt, ...)
 {
     va_list ap;
