@@ -1,0 +1,42 @@
+
+#define LOG_SOH "\001"
+#define LOG_SOH_ASCII '\001'
+
+#define LOG_EMERG LOG_SOH "0"
+#define LOG_ALERT LOG_SOH "1"
+#define LOG_CRIT LOG_SOH "2"
+#define LOG_ERR LOG_SOH "3"
+#define LOG_WARNING LOG_SOH "4"
+#define LOG_NOTICE LOG_SOH "5"
+#define LOG_INFO LOG_SOH "6"
+#define LOG_DEBUG LOG_SOH "7"
+
+#define LOG_DEFAULT ""
+
+int print(const char *fmt, ...);
+
+#define ANSI_CSI "\x1b["
+
+#define ANSI_BOLD ANSI_CSI "1m"
+#define ANSI_ITALIC ANSI_CSI "3m"
+#define ANSI_BLINK ANSI_CSI "5m"
+#define ANSI_REVERSE ANSI_CSI "7m"
+#define ANSI_RESET ANSI_CSI "0m"
+
+#define ANSI_BLACK ANSI_CSI "30m"
+#define ANSI_RED ANSI_CSI "31m"
+#define ANSI_GREEN ANSI_CSI "32m"
+#define ANSI_YELLOW ANSI_CSI "33m"
+#define ANSI_BLUE ANSI_CSI "34m"
+#define ANSI_MAGENTA ANSI_CSI "35m"
+#define ANSI_CYAN ANSI_CSI "36m"
+#define ANSI_WHITE ANSI_CSI "37m"
+
+#define ANSI_BRIGHT_BLACK ANSI_CSI "90m"
+#define ANSI_BRIGHT_RED ANSI_CSI "91m"
+#define ANSI_BRIGHT_GREEN ANSI_CSI "92m"
+#define ANSI_BRIGHT_YELLOW ANSI_CSI "93m"
+#define ANSI_BRIGHT_BLUE ANSI_CSI "94m"
+#define ANSI_BRIGHT_MAGENTA ANSI_CSI "95m"
+#define ANSI_BRIGHT_CYAN ANSI_CSI "96m"
+#define ANSI_BRIGHT_WHITE ANSI_CSI "97m"
