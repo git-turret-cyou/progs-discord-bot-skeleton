@@ -19,7 +19,6 @@ static const char *colors[] = {
     [DEBUG_LOGLEVEL] = ANSI_ITALIC ANSI_BRIGHT_BLUE,
 };
 
-int start_time = 0;
 int console_lock = 0;
 
 int print(const char *fmt, ...)
