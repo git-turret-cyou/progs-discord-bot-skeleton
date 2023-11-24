@@ -1,0 +1,24 @@
+TODO:
+
+- Credentials/config system
+ - fetch from SOMEWHERE
+ - env? built-in? header? linked in as txt?
+
+- Discord API Abstraction
+ - GET/POST/DELETE/WHATEVER api that you can send quick requests to the API
+ already authenticated.
+
+- Discord Websockets
+ - authentication
+ - libcurl
+ - reconnecting/resuming
+ - heartbeat
+
+- Event Abstractor
+
+- Name initcall levels
+ - ill figure out a use for all of the levels once i actually get some work
+ in play
+
+- command registration API
+

@@ -1,0 +1,12 @@
+HI! thank you for wanting to contribute to my project.
+
+only asks are that you follow the coding style already established (i try to
+do this aswell so come at me)
+
+i can take patches via github PRs or email (turret@duck.com)
+have something you want to add to, but its not in TODO? go ahead and send in
+your patch anyway!
+
+licensing? at time of writing, i need to find out what license i want to
+release this as. if you're contributing, please make sure to sign-off your
+commit, certifying to the contributor certificate-of-origin
