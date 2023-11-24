@@ -1,8 +1,13 @@
 #include <signal.h>
 #include <sys/wait.h>
 
+#include <config.h>
 #include <init.h>
+#include <log.h>
 #include <util.h>
+
+extern int subsystem_handle_term(int pid);
+int mainpid = 0;
 
 /* For some reason, I get SIGSEGV'd when running because a random-ass
    byte was inserted where it isnt supposed to be. Added a safety byte
@@ -48,20 +53,27 @@ static void do_initcalls(void)
 
 int main(void)
 {
+    print("init: Hello world! Running " NAME " v" VERSION "!");
+
+    mainpid = getpid();
+
+    /* Rest of the program.. */
     do_initcalls();
 
     /* Reaper. Much like init. */
-    // BUG: doesnt actually work?? we have defunct processes still
-    // TODO: fix bug
+    siginfo_t siginfo;
     static sigset_t set;
     sigaddset(&set, SIGCHLD);
     sigprocmask(SIG_BLOCK, &set, NULL);
 
     while(1) {
-        int sig;
-        sigwait(&set, &sig);
-        if(sig == SIGCHLD)
-            while(waitpid(0, NULL, WNOHANG) > 0)
-                ;
+        sigwaitinfo(&set, &siginfo);
+        int sig = siginfo.si_signo;
+        if(sig == SIGCHLD) {
+            int process = 0;
+            while((process = waitpid(-1, NULL, WNOHANG)) > 0)
+                if(subsystem_handle_term(process) > 0)
+                    print("init: failed to reap process %d", process);
+        }
     }
 }
