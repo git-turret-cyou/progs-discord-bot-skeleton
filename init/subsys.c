@@ -21,6 +21,7 @@ struct subsystem_info {
     int (*fn)(void);
     int pid;
     void *stack;
+    char mode;
 };
 
 extern int mainpid;
@@ -43,6 +44,32 @@ static int __subsystem_entry(struct subsystem_info *info)
     int ret = info->fn();
 
     return ret;
+}
+
+char *subsystem_get_name(int pid)
+{
+    for(int i = 0; i < MAX_SUBSYSTEMS; ++i) {
+        struct subsystem_info *subsystem = subsystems[i];
+        if(!subsystem || subsystem->pid != pid)
+            continue;
+
+        return subsystem->fn_name;
+    }
+    return 0;
+}
+
+int subsystem_change_mode(int pid, char mode)
+{
+    for(int i = 0; i < MAX_SUBSYSTEMS; ++i) {
+        struct subsystem_info *subsystem = subsystems[i];
+        if(!subsystem || subsystem->pid != pid)
+            continue;
+
+        subsystem->mode = mode;
+        return 0;
+    }
+
+    return 1;
 }
 
 int subsystem_handle_term(int pid)
@@ -91,6 +118,7 @@ int __impl_start_subsystem(char *fn_name, int (*fn)(void))
     info->fn_name = fn_name;
     info->fn = fn;
     info->stack = stack;
+    info->mode = 'o';
 
     int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)stack + STACK_SIZE), CLONE_FILES | CLONE_VM | SIGCHLD, info);
     info->pid = pid;
