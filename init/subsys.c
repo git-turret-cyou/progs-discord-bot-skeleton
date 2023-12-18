@@ -14,6 +14,7 @@
 #include <util.h>
 
 #define MAX_SUBSYSTEMS 32
+#define MAX_RESPAWN 3
 
 struct subsystem_info {
     char *fn_name;
@@ -21,6 +22,7 @@ struct subsystem_info {
     int pid;
     void *stack;
     char mode;
+    int respawn_count;
 };
 
 extern long stack_size;
@@ -81,8 +83,34 @@ int subsystem_handle_term(int pid)
 
         print(LOG_DEBUG "subsys: subsystem terminated %s (%d)", subsystem->fn_name, pid);
 
+        if(subsystem->mode == PANICMODE_RESPAWN
+                && subsystem->respawn_count < MAX_RESPAWN) {
+            ++(subsystem->respawn_count);
+
+            int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)(subsystem->stack) + stack_size), CLONE_FILES | CLONE_VM | SIGCHLD, subsystem);
+            subsystem->pid = pid;
+            if(pid < 0) {
+                print(LOG_CRIT "subsys: cannot re-start subsystem %s: "
+                        "clone failed (errno %d)", subsystem->fn_name, errno);
+                if(munmap(subsystem->stack, stack_size) < 0)
+                    print(LOG_CRIT "subsys: failed to deallocate "
+                            "stack for subsystem %s (%d) (errno %d)",
+                            subsystem->fn_name, pid, errno);
+                free(subsystem);
+                return 0;
+            }
+
+            subsystem->mode = 'o';
+            return 0;
+        } else if(subsystem->mode == PANICMODE_RESPAWN) {
+            panic("subsys: exceeded maximum respawn count for subsystem "
+                    "%s (%d)", subsystem->fn_name, subsystem->pid);
+        }
+
         if(munmap(subsystem->stack, stack_size) < 0)
-            print(LOG_EMERG "subsys: failed to deallocate stack for subsystem %s (%d) (errno %d)", subsystem->fn_name, pid, errno);
+            print(LOG_CRIT "subsys: failed to deallocate stack "
+                    "for subsystem %s (%d) (errno %d)",
+                    subsystem->fn_name, pid, errno);
         subsystems[i] = 0;
         free(subsystem);
 
@@ -95,19 +123,23 @@ int subsystem_handle_term(int pid)
 int __impl_start_subsystem(char *fn_name, int (*fn)(void))
 {
     if(getpid() != mainpid) {
-        print(LOG_CRIT "subsys: cannot perform subsystem inception (attempted from %d)", getpid());
+        print(LOG_CRIT "subsys: cannot perform subsystem inception "
+                "(attempted from %d)", getpid());
         return 1;
     }
     if(subsystem_count >= MAX_SUBSYSTEMS) {
-        print(LOG_CRIT "subsys: cannot start subsystem %s: reached maximum number of subsystems", fn_name);
+        print(LOG_CRIT "subsys: cannot start subsystem %s: "
+                "reached maximum number of subsystems", fn_name);
         return 1;
     }
 
     /* because CLONE_VM is being set, our stack is not duplicated and
        therefore we need to map a stack */
-    void *stack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK | MAP_PRIVATE, -1, 0);
+    void *stack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE,
+            MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK | MAP_PRIVATE, -1, 0);
     if((long)stack <= 0) {
-        print(LOG_CRIT "subsys: cannot start subsystem %s: failed to allocate stack (errno %d)", fn_name, errno);
+        print(LOG_CRIT "subsys: cannot start subsystem %s: "
+                "failed to allocate stack (errno %d)", fn_name, errno);
         return 1;
     }
 
@@ -119,11 +151,15 @@ int __impl_start_subsystem(char *fn_name, int (*fn)(void))
     info->fn = fn;
     info->stack = stack;
     info->mode = 'o';
+    info->respawn_count = 0;
 
-    int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)stack + stack_size), CLONE_FILES | CLONE_VM | SIGCHLD, info);
+    int pid = clone((int (*)(void *))__subsystem_entry,
+            (void *)((long)stack + stack_size),
+            CLONE_FILES | CLONE_VM | SIGCHLD, info);
     info->pid = pid;
     if(pid < 0) {
-        print(LOG_CRIT "subsys: cannot start subsystem %s: clone failed (errno %d)", fn_name, errno);
+        print(LOG_CRIT "subsys: cannot start subsystem %s: "
+                "clone failed (errno %d)", fn_name, errno);
         munmap(stack, stack_size);
         free(info);
         return 1;
