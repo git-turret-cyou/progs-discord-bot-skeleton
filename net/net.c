@@ -16,12 +16,22 @@ int net_subsystem(void)
 {
     print(LOG_INFO "net: starting net subsystem");
 
-
     return 0;
 }
 
 void net_get_gateway_url()
 {
+    curl_version_info_data *curl_version = curl_version_info(CURLVERSION_NOW);
+    const char * const* curl_protocols = curl_version->protocols;
+    int wss_supported = 0;
+    for(int i = 0; curl_protocols[i]; ++i) {
+        if(strcmp(curl_protocols[i], "wss") == 0)
+            wss_supported = 1;
+    }
+
+    if(!wss_supported)
+        panic("net: wss not supported by libcurl");
+
     int fd = http_get("https://discord.com/api/gateway/bot");
     if(fd < 0) {
         print(LOG_ERR "net: failed to get gateway url (error %d)", -fd);
