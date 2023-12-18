@@ -28,7 +28,7 @@ struct subsystem_info {
 extern long stack_size;
 extern int mainpid;
 static struct subsystem_info *subsystems[MAX_SUBSYSTEMS + 1];
-static int subsystem_count = 0;
+int subsystem_count = 0;
 
 static int __subsystem_entry(struct subsystem_info *info)
 {
@@ -112,6 +112,7 @@ int subsystem_handle_term(int pid)
                     "for subsystem %s (%d) (errno %d)",
                     subsystem->fn_name, pid, errno);
         subsystems[i] = 0;
+        --subsystem_count;
         free(subsystem);
 
         return 0;
