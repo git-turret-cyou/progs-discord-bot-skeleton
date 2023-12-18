@@ -159,6 +159,8 @@ void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
 
     console_lock = 0;
     free(_fmt);
+    free(backtrace_symbolnames);
+    free(backtrace_addresses);
     va_end(ap);
 
     if(mode == PANICMODE_DEBUGONLY)
