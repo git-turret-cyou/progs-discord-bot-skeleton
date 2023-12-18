@@ -157,6 +157,8 @@ void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
     if(mode == PANICMODE_DIE)
         kill(-getpgid(pid), SIGINT);
 
+    print(NOLOCK("5") "------------[ cut here ]------------");
+
     console_lock = 0;
     free(_fmt);
     free(backtrace_symbolnames);
