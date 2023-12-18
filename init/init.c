@@ -1,4 +1,6 @@
 #include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 
 #include <config.h>
@@ -8,6 +10,7 @@
 
 extern int subsystem_handle_term(int pid);
 int mainpid = 0;
+char *token;
 
 /* For some reason, I get SIGSEGV'd when running because a random-ass
    byte was inserted where it isnt supposed to be. Added a safety byte
@@ -55,7 +58,17 @@ int main(void)
 {
     print("init: Hello world! Running " NAME " v" VERSION "!");
 
+    /* set mainpid for the subsystem service so it is fully accessible during l1 */
     mainpid = getpid();
+
+    /* fetch token */
+    char *token_base = getenv("TOKEN");
+    if(!token_base)
+        panic("init: cannot find TOKEN in env");
+
+    token = calloc(strlen(token_base) + strlen("Authorization: Bot ") + 1, sizeof(char));
+    strcpy(token, "Authorization: Bot ");
+    strcat(token, token_base);
 
     /* Rest of the program.. */
     do_initcalls();
@@ -73,7 +86,7 @@ int main(void)
             int process = 0;
             while((process = waitpid(-1, NULL, WNOHANG)) > 0)
                 if(subsystem_handle_term(process) > 0)
-                    print("init: failed to reap process %d", process);
+                    print(LOG_WARNING "init: failed to reap process %d", process);
         }
     }
 }
