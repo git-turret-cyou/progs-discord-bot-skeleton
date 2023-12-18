@@ -169,7 +169,7 @@ void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
     if(pid != mainpid && mode == PANICMODE_RESPAWN) {
         /* we want to let the main process handle the rest */
         subsystem_change_mode(pid, mode);
-        syscall(SYS_exit, 1);
+        syscall(SYS_exit_group, 1);
     }
 }
 
