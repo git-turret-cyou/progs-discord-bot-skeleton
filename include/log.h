@@ -1,4 +1,3 @@
-
 #define LOG_SOH "\001"
 #define LOG_SOH_ASCII '\001'
 
@@ -14,18 +13,32 @@
 #define DEFAULT_LOGLEVEL NOTICE_LOGLEVEL
 #define CONSOLE_LOGLEVEL DEBUG_LOGLEVEL
 
-#define LOG_EMERG LOG_SOH "0"
-#define LOG_ALERT LOG_SOH "1"
-#define LOG_CRIT LOG_SOH "2"
-#define LOG_ERR LOG_SOH "3"
-#define LOG_WARNING LOG_SOH "4"
-#define LOG_NOTICE LOG_SOH "5"
-#define LOG_INFO LOG_SOH "6"
-#define LOG_DEBUG LOG_SOH "7"
+#define LOG_EMERG LOG_SOH "\1" "0"
+#define LOG_ALERT LOG_SOH "\1" "1"
+#define LOG_CRIT LOG_SOH "\1" "2"
+#define LOG_ERR LOG_SOH "\1" "3"
+#define LOG_WARNING LOG_SOH "\1" "4"
+#define LOG_NOTICE LOG_SOH "\1" "5"
+#define LOG_INFO LOG_SOH "\1" "6"
+#define LOG_DEBUG LOG_SOH "\1" "7"
 
 #define LOG_DEFAULT ""
 
 int print(const char *fmt, ...);
+
+#define PANICMODE_DEBUGONLY 'o'
+#define PANICMODE_RESPAWN 'r'
+#define PANICMODE_DIE 'd'
+
+#define PANIC_OOPS LOG_SOH #PANICMODE_DEBUGONLY
+#define PANIC_RESPAWN LOG_SOH #PANICMODE_RESPAWN
+#define PANIC_PANIC LOG_SOH #PANICMODE_DIE
+
+#define PANIC_DEFAULT PANIC_PANIC
+
+void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...);
+#define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
+#define oops(...) _panic(__FILE__, __LINE__, PANIC_OOPS __VA_ARGS__)
 
 #define ANSI_CSI "\x1b["
 

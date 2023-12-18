@@ -22,3 +22,9 @@ TODO:
 
 - command registration API
 
+- Panic
+ - Print tons of debug info
+ - Levels:
+  - Oops (fake panic, no die)
+  - Respawn (respawns subsystem in case of nonfatal)
+  - Real panic (fatal error, kills all subsystems and destroys all)

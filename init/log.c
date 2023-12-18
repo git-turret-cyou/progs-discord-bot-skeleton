@@ -1,12 +1,20 @@
+#include <execinfo.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/syscall.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 #include <log.h>
 #include <util.h>
+
+extern int subsystem_change_mode(int pid, char mode);
+extern char *subsystem_get_name(int pid);
+extern int mainpid;
 
 static const char *colors[] = {
     [EMERG_LOGLEVEL] = ANSI_BLINK ANSI_REVERSE ANSI_BOLD ANSI_RED,
@@ -19,14 +27,27 @@ static const char *colors[] = {
     [DEBUG_LOGLEVEL] = ANSI_ITALIC ANSI_BRIGHT_BLUE,
 };
 
+static const char *mode_to_string[] = {
+    [PANICMODE_DEBUGONLY] = "subsystem OOPS",
+    [PANICMODE_RESPAWN] = "subsystem failure",
+    [PANICMODE_DIE] = "catastrophic failure",
+};
+
 int console_lock = 0;
 
-int print(const char *fmt, ...)
+static int vaprint(const char *fmt, va_list ap)
 {
     int loglevel = DEFAULT_LOGLEVEL;
+    int dolocks = 1;
+    int parsecolon = 1;
     if(fmt[0] == LOG_SOH_ASCII) {
-        loglevel = (fmt[1] - 0x30) % 10;
-        fmt += 2;
+        loglevel = (fmt[2] - 0x30) % 10;
+        char flags = fmt[1];
+        if(flags & 1 << 1)
+            dolocks = 0;
+        if(flags & 1 << 2)
+            parsecolon = 0;
+        fmt += 3;
     }
 
     /* not going to be printed? dont bother! */
@@ -37,16 +58,15 @@ int print(const char *fmt, ...)
        later we will parse it and print out ANSI colors and what not */
     char buf[512];
 
-    va_list ap;
-    va_start(ap, fmt);
     vsnprintf(buf, 512, fmt, ap);
-    va_end(ap);
     buf[512 - 1] = '\0';
 
     size_t colon = 0;
-    for(; colon < strlen(buf); ++colon) {
-        if(buf[colon] == ':')
-            break;
+    if(parsecolon) {
+        for(; colon < strlen(buf); ++colon) {
+            if(buf[colon] == ':')
+                break;
+        }
     }
 
     char tsbuf[64] = "\0";
@@ -60,18 +80,20 @@ int print(const char *fmt, ...)
        at the same time. I considered simply writing all at once, but
        ended up just not caring enough to the point where spinlocks
        prevail. */
-    __asm__(".spin_lock:");
-    __asm__("mov rax, 1");
-    __asm__("xchg rax, [console_lock]");
-    __asm__("test rax, rax");
-    __asm__("jnz .spin_lock");
+    if(dolocks) {
+        __asm__(".spin_lock:");
+        __asm__("mov rax, 1");
+        __asm__("xchg rax, [console_lock]");
+        __asm__("test rax, rax");
+        __asm__("jnz .spin_lock");
+    }
 
     /* we want to support stuff without colons, but frankly I havent
        tested this at time of writing. will find out later */
     writeputs(ANSI_RESET ANSI_GREEN);
     writeputs(tsbuf);
     writeputs(ANSI_RESET);
-    if(buf[colon] == ':') {
+    if(parsecolon && buf[colon] == ':') {
         writeputs(colors[loglevel]);
         writeputs(ANSI_YELLOW);
         write(STDOUT_FILENO, buf, colon);
@@ -85,7 +107,76 @@ int print(const char *fmt, ...)
     }
     writeputs(ANSI_RESET);
     write(STDOUT_FILENO, "\n", 1);
+    if(dolocks)
+        console_lock = 0;
+    return 0;
+}
+
+void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
+{
+    char mode = PANICMODE_DIE;
+    int pid = getpid();
+    if(fmt[0] == LOG_SOH_ASCII) {
+        mode = fmt[1];
+        /* cannot respawn main thread */
+        if(pid == mainpid && mode == PANICMODE_RESPAWN)
+            mode = PANICMODE_DIE;
+        fmt += 2;
+    }
+
+#define NOLOCK(loglevel) LOG_SOH "\3" loglevel
+    va_list ap;
+    va_start(ap, fmt);
+    char *_fmt = malloc(strlen(fmt) + 4 * sizeof(char));
+    sprintf(_fmt, NOLOCK("1") "%s", fmt);
+
+    void **backtrace_addresses = malloc(sizeof(void*) * 32);
+    int backtrace_count = backtrace(backtrace_addresses, 32);
+    char **backtrace_symbolnames = backtrace_symbols(backtrace_addresses, backtrace_count);
+
+    __asm__("_panic.spin_lock:");
+    __asm__("mov rax, 1");
+    __asm__("xchg rax, [console_lock]");
+    __asm__("test rax, rax");
+    __asm__("jnz .spin_lock");
+
+    print(NOLOCK("5") "------------[ cut here ]------------");
+    print(LOG_SOH "\7""0"  "%s at %s:%d", mode_to_string[(int)mode], fileorigin, lineorigin);
+    vaprint(_fmt, ap);
+    print(LOG_SOH "\7""7" "Call Trace:");
+    for(int i = 0; i < backtrace_count; ++i) {
+        print(NOLOCK("7") " [0x%016x]  %s", backtrace_addresses[i], backtrace_symbolnames[i]);
+    }
+    if(mainpid == pid){
+        print(NOLOCK("7") "                       <start of main thread>");
+    } else {
+        print(NOLOCK("7") "                       <start of %s[%d]>", subsystem_get_name(pid), pid);
+    }
+
+    /* if we are going to die, we dont really need to clean up */
+    if(mode == PANICMODE_DIE)
+        kill(-getpgid(pid), SIGINT);
 
     console_lock = 0;
-    return 0;
+    free(_fmt);
+    va_end(ap);
+
+    if(mode == PANICMODE_DEBUGONLY)
+        return;
+
+    if(pid != mainpid && mode == PANICMODE_RESPAWN) {
+        /* we want to let the main process handle the rest */
+        subsystem_change_mode(pid, mode);
+        syscall(SYS_exit, 1);
+    }
+}
+
+int print(const char *fmt, ...)
+{
+    int ret = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    ret = vaprint(fmt, ap);
+    va_end(ap);
+    return ret;
 }
