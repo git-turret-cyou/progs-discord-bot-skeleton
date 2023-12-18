@@ -10,6 +10,7 @@
 #include <util.h>
 
 extern int subsystem_handle_term(int pid);
+extern int subsystem_count;
 int mainpid = 0;
 long stack_size = 8192 * 512;
 char *token;
@@ -89,7 +90,7 @@ int main(void)
     sigaddset(&set, SIGCHLD);
     sigprocmask(SIG_BLOCK, &set, NULL);
 
-    while(1) {
+    while(subsystem_count > 0) {
         sigwaitinfo(&set, &siginfo);
         int sig = siginfo.si_signo;
         if(sig == SIGCHLD) {
@@ -99,4 +100,6 @@ int main(void)
                     print(LOG_WARNING "init: failed to reap process %d", process);
         }
     }
+
+    panic("init: no more subsystems");
 }
