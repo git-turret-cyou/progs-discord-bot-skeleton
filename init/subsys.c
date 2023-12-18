@@ -13,7 +13,6 @@
 #include <log.h>
 #include <util.h>
 
-#define STACK_SIZE 8192 * 512
 #define MAX_SUBSYSTEMS 32
 
 struct subsystem_info {
@@ -24,6 +23,7 @@ struct subsystem_info {
     char mode;
 };
 
+extern long stack_size;
 extern int mainpid;
 static struct subsystem_info *subsystems[MAX_SUBSYSTEMS + 1];
 static int subsystem_count = 0;
@@ -81,7 +81,7 @@ int subsystem_handle_term(int pid)
 
         print(LOG_DEBUG "subsys: subsystem terminated %s (%d)", subsystem->fn_name, pid);
 
-        if(munmap(subsystem->stack, STACK_SIZE) < 0)
+        if(munmap(subsystem->stack, stack_size) < 0)
             print(LOG_EMERG "subsys: failed to deallocate stack for subsystem %s (%d) (errno %d)", subsystem->fn_name, pid, errno);
         subsystems[i] = 0;
         free(subsystem);
@@ -105,7 +105,7 @@ int __impl_start_subsystem(char *fn_name, int (*fn)(void))
 
     /* because CLONE_VM is being set, our stack is not duplicated and
        therefore we need to map a stack */
-    void *stack = mmap(NULL, STACK_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK | MAP_PRIVATE, -1, 0);
+    void *stack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK | MAP_PRIVATE, -1, 0);
     if((long)stack <= 0) {
         print(LOG_CRIT "subsys: cannot start subsystem %s: failed to allocate stack (errno %d)", fn_name, errno);
         return 1;
@@ -120,11 +120,11 @@ int __impl_start_subsystem(char *fn_name, int (*fn)(void))
     info->stack = stack;
     info->mode = 'o';
 
-    int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)stack + STACK_SIZE), CLONE_FILES | CLONE_VM | SIGCHLD, info);
+    int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)stack + stack_size), CLONE_FILES | CLONE_VM | SIGCHLD, info);
     info->pid = pid;
     if(pid < 0) {
         print(LOG_CRIT "subsys: cannot start subsystem %s: clone failed (errno %d)", fn_name, errno);
-        munmap(stack, STACK_SIZE);
+        munmap(stack, stack_size);
         free(info);
         return 1;
     }

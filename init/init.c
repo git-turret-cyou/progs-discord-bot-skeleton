@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 
 #include <config.h>
@@ -10,6 +11,7 @@
 
 extern int subsystem_handle_term(int pid);
 int mainpid = 0;
+long stack_size = 8192 * 512;
 char *token;
 
 /* For some reason, I get SIGSEGV'd when running because a random-ass
@@ -60,6 +62,14 @@ int main(void)
 
     /* set mainpid for the subsystem service so it is fully accessible during l1 */
     mainpid = getpid();
+
+    /* set stack_size for subsystem service */
+    struct rlimit *stack_rlimit = malloc(sizeof(struct rlimit));
+    getrlimit(RLIMIT_STACK, stack_rlimit);
+    if(stack_rlimit->rlim_cur != RLIM_INFINITY) {
+        stack_size = stack_rlimit->rlim_cur;
+    }
+    free(stack_rlimit);
 
     /* fetch token */
     char *token_base = getenv("TOKEN");
