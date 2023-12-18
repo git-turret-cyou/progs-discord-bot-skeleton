@@ -26,7 +26,8 @@ int http_get(char *url)
 
     curl_easy_setopt(job, CURLOPT_URL, url);
     curl_easy_setopt(job, CURLOPT_WRITEDATA, write_end);
-    curl_easy_setopt(job, CURLOPT_HTTPHEADER, curl_slist_append(NULL, token));
+    curl_easy_setopt(job, CURLOPT_HTTPHEADER,
+            curl_slist_append(NULL, token));
     CURLcode res = curl_easy_perform(job);
 
     if(res > 0) {

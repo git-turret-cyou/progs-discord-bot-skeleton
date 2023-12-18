@@ -41,7 +41,8 @@ static int __subsystem_entry(struct subsystem_info *info)
     prctl(PR_SET_NAME, name);
     free(name);
 
-    print(LOG_DEBUG "subsys: starting subsystem %s (%d)", info->fn_name, getpid());
+    print(LOG_DEBUG "subsys: starting subsystem %s (%d)",
+            info->fn_name, getpid());
 
     int ret = info->fn();
 
@@ -81,13 +82,16 @@ int subsystem_handle_term(int pid)
         if(!subsystem || subsystem->pid != pid)
             continue;
 
-        print(LOG_DEBUG "subsys: subsystem terminated %s (%d)", subsystem->fn_name, pid);
+        print(LOG_DEBUG "subsys: subsystem terminated %s (%d)",
+                subsystem->fn_name, pid);
 
         if(subsystem->mode == PANICMODE_RESPAWN
                 && subsystem->respawn_count < MAX_RESPAWN) {
             ++(subsystem->respawn_count);
 
-            int pid = clone((int (*)(void *))__subsystem_entry, (void *)((long)(subsystem->stack) + stack_size), CLONE_FILES | CLONE_VM | SIGCHLD, subsystem);
+            int pid = clone((int (*)(void *))__subsystem_entry,
+                    (void *)((long)(subsystem->stack) + stack_size),
+                    CLONE_FILES | CLONE_VM | SIGCHLD, subsystem);
             subsystem->pid = pid;
             if(pid < 0) {
                 print(LOG_CRIT "subsys: cannot re-start subsystem %s: "

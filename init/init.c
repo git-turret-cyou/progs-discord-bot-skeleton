@@ -45,7 +45,9 @@ static void do_initcall_level(int level)
 {
     initcall_entry_t *fn;
 
-    for (fn = initcall_levels[level - 1]; fn < initcall_levels[level]; fn++)
+    for (fn = initcall_levels[level - 1];
+            fn < initcall_levels[level];
+            fn++)
         initcall_from_entry(fn)();
 }
 
@@ -61,7 +63,8 @@ int main(void)
 {
     print("init: Hello world! Running " NAME " v" VERSION "!");
 
-    /* set mainpid for the subsystem service so it is fully accessible during l1 */
+    /* set mainpid for the subsystem service so it is fully accessible
+       during l1 */
     mainpid = getpid();
 
     /* set stack_size for subsystem service */
@@ -77,7 +80,8 @@ int main(void)
     if(!token_base)
         panic("init: cannot find TOKEN in env");
 
-    token = calloc(strlen(token_base) + strlen("Authorization: Bot ") + 1, sizeof(char));
+    token = calloc(strlen(token_base) + strlen("Authorization: Bot ") + 1,
+            sizeof(char));
     strcpy(token, "Authorization: Bot ");
     strcat(token, token_base);
 
@@ -97,7 +101,8 @@ int main(void)
             int process = 0;
             while((process = waitpid(-1, NULL, WNOHANG)) > 0)
                 if(subsystem_handle_term(process) > 0)
-                    print(LOG_WARNING "init: failed to reap process %d", process);
+                    print(LOG_WARNING "init: failed to reap process %d",
+                            process);
         }
     }
 

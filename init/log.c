@@ -8,7 +8,6 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <unistd.h>
-
 #include <log.h>
 #include <util.h>
 
@@ -72,7 +71,8 @@ static int vaprint(const char *fmt, va_list ap)
     char tsbuf[64] = "\0";
     struct timeval time;
     gettimeofday(&time, NULL);
-    snprintf(tsbuf, sizeof(tsbuf), "[%5ld.%06ld] ", (long)time.tv_sec % 100000, (long)time.tv_usec);
+    snprintf(tsbuf, sizeof(tsbuf), "[%5ld.%06ld] ",
+            (long)time.tv_sec % 100000, (long)time.tv_usec);
 
     /* spin lock, at the cost of architecture portability
        concurrency is something that we need to adjust for, and the
@@ -112,7 +112,9 @@ static int vaprint(const char *fmt, va_list ap)
     return 0;
 }
 
-void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
+void _panic(const char *fileorigin,
+        const int lineorigin,
+        const char *fmt, ...)
 {
     char mode = PANICMODE_DIE;
     int pid = getpid();
@@ -132,7 +134,8 @@ void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
 
     void **backtrace_addresses = malloc(sizeof(void*) * 32);
     int backtrace_count = backtrace(backtrace_addresses, 32);
-    char **backtrace_symbolnames = backtrace_symbols(backtrace_addresses, backtrace_count);
+    char **backtrace_symbolnames =
+        backtrace_symbols(backtrace_addresses, backtrace_count);
 
     __asm__("_panic.spin_lock:");
     __asm__("mov rax, 1");
@@ -141,16 +144,19 @@ void _panic(const char *fileorigin, const int lineorigin, const char *fmt, ...)
     __asm__("jnz .spin_lock");
 
     print(NOLOCK("5") "------------[ cut here ]------------");
-    print(LOG_SOH "\7""0"  "%s at %s:%d", mode_to_string[(int)mode], fileorigin, lineorigin);
+    print(LOG_SOH "\7""0"  "%s at %s:%d", mode_to_string[(int)mode],
+            fileorigin, lineorigin);
     vaprint(_fmt, ap);
     print(LOG_SOH "\7""7" "Call Trace:");
     for(int i = 0; i < backtrace_count; ++i) {
-        print(NOLOCK("7") " [0x%016x]  %s", backtrace_addresses[i], backtrace_symbolnames[i]);
+        print(NOLOCK("7") " [0x%016x]  %s", backtrace_addresses[i],
+                backtrace_symbolnames[i]);
     }
     if(mainpid == pid){
         print(NOLOCK("7") "                       <start of main thread>");
     } else {
-        print(NOLOCK("7") "                       <start of %s[%d]>", subsystem_get_name(pid), pid);
+        print(NOLOCK("7") "                       <start of %s[%d]>",
+                subsystem_get_name(pid), pid);
     }
 
     /* if we are going to die, we dont really need to clean up */
