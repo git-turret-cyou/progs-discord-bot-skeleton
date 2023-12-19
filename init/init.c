@@ -5,6 +5,8 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 
+#include <curl/curl.h>
+
 #include <config.h>
 #include <init.h>
 #include <log.h>
@@ -85,6 +87,10 @@ int main(void)
             sizeof(char));
     strcpy(token, "Authorization: Bot ");
     strcat(token, token_base);
+
+    /* init curl */
+    if(curl_global_init(CURL_GLOBAL_DEFAULT))
+        panic("init: curl init failed");
 
     /* Rest of the program.. */
     do_initcalls();
