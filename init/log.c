@@ -42,7 +42,7 @@ retry:
         ;
 
     asm("mov %0, 1\n\t"
-        "xchg %0, %1" : "=r" (rax) : "m" (console_lock));
+        "xchg %0, %1" : "=r" (rax), "=m" (console_lock));
 
     if(rax)
         goto retry;
