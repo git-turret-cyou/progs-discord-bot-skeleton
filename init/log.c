@@ -32,7 +32,23 @@ static const char *mode_to_string[] = {
     [PANICMODE_DIE] = "catastrophic failure",
 };
 
-int console_lock = 0;
+static int console_lock = 0;
+
+static void obtain_console_lock()
+{
+    register int rax asm("rax");
+retry:
+    while(console_lock)
+        ;
+
+    asm("mov %0, 1\n\t"
+        "xchg %0, %1" : "=r" (rax) : "m" (console_lock));
+
+    if(rax)
+        goto retry;
+
+    return;
+}
 
 static int vaprint(const char *fmt, va_list ap)
 {
@@ -80,13 +96,9 @@ static int vaprint(const char *fmt, va_list ap)
        at the same time. I considered simply writing all at once, but
        ended up just not caring enough to the point where spinlocks
        prevail. */
-    if(dolocks) {
-        __asm__(".spin_lock:");
-        __asm__("mov rax, 1");
-        __asm__("xchg rax, [console_lock]");
-        __asm__("test rax, rax");
-        __asm__("jnz .spin_lock");
-    }
+    if(dolocks)
+        obtain_console_lock();
+
 
     /* we want to support stuff without colons, but frankly I havent
        tested this at time of writing. will find out later */
@@ -137,11 +149,7 @@ void _panic(const char *fileorigin,
     char **backtrace_symbolnames =
         backtrace_symbols(backtrace_addresses, backtrace_count);
 
-    __asm__("_panic.spin_lock:");
-    __asm__("mov rax, 1");
-    __asm__("xchg rax, [console_lock]");
-    __asm__("test rax, rax");
-    __asm__("jnz .spin_lock");
+    obtain_console_lock();
 
     print(NOLOCK("5") "------------[ cut here ]------------");
     print(LOG_SOH "\7""0"  "%s at %s:%d", mode_to_string[(int)mode],

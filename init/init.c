@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/param.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 
@@ -71,7 +72,7 @@ int main(void)
     struct rlimit *stack_rlimit = malloc(sizeof(struct rlimit));
     getrlimit(RLIMIT_STACK, stack_rlimit);
     if(stack_rlimit->rlim_cur != RLIM_INFINITY) {
-        stack_size = stack_rlimit->rlim_cur;
+        stack_size = MIN(stack_rlimit->rlim_cur, stack_size);
     }
     free(stack_rlimit);
 
