@@ -26,8 +26,10 @@ void net_get_gateway_url()
     const char * const* curl_protocols = curl_version->protocols;
     int wss_supported = 0;
     for(int i = 0; curl_protocols[i]; ++i) {
-        if(strcmp(curl_protocols[i], "wss") == 0)
+        if(strcmp(curl_protocols[i], "wss") == 0) {
             wss_supported = 1;
+            break;
+        }
     }
 
     if(!wss_supported)
