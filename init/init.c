@@ -99,6 +99,7 @@ int main(void)
     siginfo_t siginfo;
     static sigset_t set;
     sigaddset(&set, SIGCHLD);
+    sigaddset(&set, SIGINT);
     sigprocmask(SIG_BLOCK, &set, NULL);
 
     while(subsystem_count > 0) {
@@ -113,6 +114,8 @@ int main(void)
             if(siginfo.si_status != 0) {
                 panic("init: process %d exited with non-zero status (%d)", siginfo.si_status);
             }
+        } else if(sig == SIGINT) {
+            panic("init: keyboard interrupt");
         }
     }
 

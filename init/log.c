@@ -168,8 +168,9 @@ void _panic(const char *fileorigin,
     }
 
     /* if we are going to die, we dont really need to clean up */
-    if(mode == PANICMODE_DIE)
-        kill(-getpgid(pid), SIGINT);
+    if(mode == PANICMODE_DIE) {
+        kill(-getpgid(pid), SIGKILL);
+    }
 
     print(NOLOCK("5") "------------[ cut here ]------------");
 
