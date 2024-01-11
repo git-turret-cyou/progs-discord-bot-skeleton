@@ -110,6 +110,9 @@ int main(void)
                 if(subsystem_handle_term(process) > 0)
                     print(LOG_WARNING "init: failed to reap process %d",
                             process);
+            if(siginfo.si_status != 0) {
+                panic("init: process %d exited with non-zero status (%d)", siginfo.si_status);
+            }
         }
     }
 
