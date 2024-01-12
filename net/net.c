@@ -56,20 +56,23 @@ void net_get_gateway_url()
         goto assume;
     }
 
-    char *gateway_url = calloc(strlen(gateway_url_json->valuestring) + 1,
+    gateway_url = calloc(strlen(gateway_url_json->valuestring) + 1,
             sizeof(char));
     strcpy(gateway_url, gateway_url_json->valuestring);
+    gateway_url[0] = 'W';
+    gateway_url[1] = 'S';
+    gateway_url[2] = 'S';
+
     print(LOG_DEBUG "net: using gateway url %s", gateway_url);
 
-    free(gateway_url);
     cJSON_Delete(gateway_info);
     return;
 
 assume:
-    print(LOG_DEBUG "net: assuming gateway url wss://gateway.discord.gg");
-    gateway_url = calloc(strlen("wss://gateway.discord.gg") + 1,
+    print(LOG_DEBUG "net: assuming gateway url WSS://gateway.discord.gg");
+    gateway_url = calloc(strlen("WSS://gateway.discord.gg") + 1,
             sizeof(char));
-    strcpy(gateway_url, "wss://gateway.discord.gg");
+    strcpy(gateway_url, "WSS://gateway.discord.gg");
     return;
 }
 l1_initcall(net_get_gateway_url);
