@@ -34,18 +34,24 @@ static const char *mode_to_string[] = {
 
 static int console_lock = 0;
 
-static void obtain_console_lock()
+#define MAX_TRY_COUNT 2 << 16
+static void obtain_console_lock(void)
 {
+    int try_count = 0;
     register int rax asm("rax");
 retry:
-    while(console_lock)
-        ;
+    while(console_lock && try_count <= MAX_TRY_COUNT)
+        try_count += 1;
 
-    asm("mov %0, 1\n\t"
+    asm("mov %0, 1 \n"
         "xchg %0, %1" : "=r" (rax), "=m" (console_lock));
 
-    if(rax)
+    if(rax > 0 && try_count <= MAX_TRY_COUNT)
         goto retry;
+
+    if(try_count > MAX_TRY_COUNT) {
+        print(LOG_SOH "\3" "4" "log: broken console lock");
+    }
 
     return;
 }
