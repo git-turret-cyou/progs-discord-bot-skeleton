@@ -92,6 +92,9 @@ int main(void)
     if(curl_global_init(CURL_GLOBAL_DEFAULT))
         panic("init: curl init failed");
 
+    /* init random seed */
+    srand(time(NULL));
+
     /* Rest of the program.. */
     do_initcalls();
 
@@ -112,7 +115,7 @@ int main(void)
                     print(LOG_WARNING "init: failed to reap process %d",
                             process);
             if(siginfo.si_status != 0) {
-                panic("init: process %d exited with non-zero status (%d)", siginfo.si_status);
+                panic("init: process %d exited with non-zero status (%d)", siginfo.si_pid, siginfo.si_status);
             }
         } else if(sig == SIGINT) {
             panic("init: keyboard interrupt");
