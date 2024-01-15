@@ -41,6 +41,10 @@ static int __subsystem_entry(struct subsystem_info *info)
     prctl(PR_SET_NAME, name);
     free(name);
 
+    /* clear signal handlers so SIGTERM is no longer caught */
+    static sigset_t set;
+    sigprocmask(SIG_SETMASK, &set, NULL);
+
     print(LOG_DEBUG "subsys: starting subsystem %s (%d)",
             info->fn_name, getpid());
 
