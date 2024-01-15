@@ -103,6 +103,7 @@ int main(void)
     static sigset_t set;
     sigaddset(&set, SIGCHLD);
     sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
     sigprocmask(SIG_BLOCK, &set, NULL);
 
     while(subsystem_count > 0) {
@@ -119,6 +120,8 @@ int main(void)
             }
         } else if(sig == SIGINT) {
             panic("init: keyboard interrupt");
+        } else if(sig == SIGTERM) {
+            exit(0);
         }
     }
 
