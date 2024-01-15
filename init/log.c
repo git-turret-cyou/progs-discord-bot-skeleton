@@ -34,7 +34,7 @@ static const char *mode_to_string[] = {
 
 static int console_lock = 0;
 
-#define MAX_TRY_COUNT 2 << 16
+#define MAX_TRY_COUNT 1 << 17
 static void obtain_console_lock(void)
 {
     int try_count = 0;
