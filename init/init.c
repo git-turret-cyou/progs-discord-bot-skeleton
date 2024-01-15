@@ -62,6 +62,8 @@ static void do_initcalls(void)
     }
 }
 
+
+
 int main(void)
 {
     print("init: Hello world! Running " NAME " v" VERSION "!");
@@ -77,6 +79,15 @@ int main(void)
         stack_size = MIN(stack_rlimit->rlim_cur, stack_size);
     }
     free(stack_rlimit);
+
+    /* configure signal handlers early to prevent race condition where subsystems
+       can terminate main process on accident, and disable Terminated output during
+       early-mode panic */
+    static sigset_t set;
+    sigaddset(&set, SIGCHLD);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
+    sigprocmask(SIG_BLOCK, &set, NULL);
 
     /* fetch token */
     char *token_base = getenv("TOKEN");
@@ -99,13 +110,8 @@ int main(void)
     do_initcalls();
 
     /* Reaper. Much like init. */
-    siginfo_t siginfo;
-    static sigset_t set;
-    sigaddset(&set, SIGCHLD);
-    sigaddset(&set, SIGINT);
-    sigaddset(&set, SIGTERM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
 
+    siginfo_t siginfo;
     while(subsystem_count > 0) {
         sigwaitinfo(&set, &siginfo);
         int sig = siginfo.si_signo;
