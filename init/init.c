@@ -115,7 +115,8 @@ int main(void)
     while(subsystem_count > 0) {
         sigwaitinfo(&set, &siginfo);
         int sig = siginfo.si_signo;
-        if(sig == SIGCHLD) {
+        switch(sig) {
+        case SIGCHLD: ;
             int process = 0;
             while((process = waitpid(-1, NULL, WNOHANG)) > 0)
                 if(subsystem_handle_term(process) > 0)
@@ -124,10 +125,15 @@ int main(void)
             if(siginfo.si_status != 0) {
                 panic("init: process %d exited with non-zero status (%d)", siginfo.si_pid, siginfo.si_status);
             }
-        } else if(sig == SIGINT) {
+            break;
+        case SIGINT:
             panic("init: keyboard interrupt");
-        } else if(sig == SIGTERM) {
+            break;
+        case SIGTERM:
             exit(0);
+            break;
+        default:
+            break;
         }
     }
 
