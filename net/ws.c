@@ -21,6 +21,10 @@ void ws_send_heartbeat()
     size_t sent;
     curl_ws_send(ws_handle, buf, strnlen(buf, 128), &sent, 0, CURLWS_TEXT);
 
+    /* if we receive a heartbeat request from discord, we need to fix
+       the itimer so we don't send another one before the desired
+       heartbeat interval. if our itimer is off more than 2 seconds
+       then we fix it up and reset it */
     struct itimerval itimer;
     getitimer(ITIMER_REAL, &itimer);
     if(itimer.it_value.tv_sec < heartbeat_time.tv_sec - 2) {
@@ -32,12 +36,14 @@ void ws_send_heartbeat()
 void ws_handle_event(cJSON *event)
 {
     int op = cJSON_GetObjectItem(event, "op")->valueint;
+    cJSON *data = cJSON_GetObjectItem(event, "d")
     switch(op) {
     case 1: /* Heartbeat request */
         ws_send_heartbeat();
         break;
     case 10: ; /* Hello */
-        int heartbeat_wait = cJSON_GetObjectItem(cJSON_GetObjectItem(event, "d"), "heartbeat_interval")->valueint;
+        int heartbeat_wait = cJSON_GetObjectItem(data,
+                "heartbeat_interval")->valueint;
         float jitter = (float)rand() / (RAND_MAX * 1.0f);
 
         heartbeat_time.tv_sec = heartbeat_wait / 1000;
@@ -52,7 +58,7 @@ void ws_handle_event(cJSON *event)
         };
         setitimer(ITIMER_REAL, &new_itimer, NULL);
         break;
-    case 11:
+    case 11: /* Heartbeat ACK */
         break;
     default:
         print(LOG_ERR "ws: received unknown WS opcode %d", op);

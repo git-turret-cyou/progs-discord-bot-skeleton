@@ -25,19 +25,10 @@ int net_subsystem(void)
 {
     print(LOG_INFO "net: starting net subsystem");
 
-    /* Set handler for heartbeats */
-    /*
-    struct sigaction *alrmhandler = malloc(sizeof(struct sigaction));
-    memset(alrmhandler, 0, sizeof(struct sigaction));
-    alrmhandler->sa_handler = &ws_send_heartbeat;
-    alrmhandler->sa_flags |= SA_RESTART;
-    sigaction(SIGALRM, alrmhandler, NULL);
-    free(alrmhandler);
-    */
-
     if(!gateway_url)
         panic("net: gateway url invalid");
 
+    /* Initialise CURL */
     ws_handle = curl_easy_init();
 
     curl_easy_setopt(ws_handle, CURLOPT_URL, gateway_url);
@@ -54,13 +45,6 @@ int net_subsystem(void)
                     CURLINFO_ACTIVESOCKET, &ws_sockfd)) != CURLE_OK)
         panic("net: curl cannot get active socket (errno %d)", ret);
 
-/*    struct pollfd ws_sockpoll = {
-        .fd = ws_sockfd,
-        .events = POLLIN
-    }; */
-    char *inbuf = malloc(1<<16 * sizeof(char));
-    size_t rlen;
-    const struct curl_ws_frame *meta;
 
     /* Block ALRM */
     sigset_t *set = malloc(sizeof(sigset_t));
@@ -69,6 +53,7 @@ int net_subsystem(void)
     int alrmfd = signalfd(-1, set, 0);
     free(set);
 
+    /* Prepare poll */
     struct pollfd pollarray[2] = {
         {
             .fd = ws_sockfd,
@@ -85,14 +70,23 @@ int net_subsystem(void)
     struct pollfd *sockpoll = &(pollarray[0]);
     struct pollfd *alrmpoll = &(pollarray[1]);
 
+    /* Misc. variables */
+    char *inbuf = malloc(1<<16 * sizeof(char));
+    size_t rlen;
+    const struct curl_ws_frame *meta;
+
     errno = 0;
     do {
         if((sockpoll->revents & POLLIN) == POLLIN) {
             ret = curl_ws_recv(ws_handle, inbuf, 1<<16, &rlen, &meta);
+            /* sometimes only SSL information gets sent through, so no actual
+               data is received. curl uses NONBLOCK internally so it lets us
+               know if there is no more data remaining */
             if(ret == CURLE_AGAIN)
                 continue;
             if(ret != CURLE_OK) {
-                print(LOG_ERR "net: encountered curl error while reading socket (curl errno %d)", ret);
+                print(LOG_ERR "net: encountered curl error while reading "
+                        "socket (curl errno %d)", ret);
                 break;
             }
 
@@ -109,8 +103,10 @@ int net_subsystem(void)
             }
             ws_handle_event(event);
             cJSON_Delete(event);
-        } else if((sockpoll->revents & (POLLRDHUP | POLLERR | POLLHUP | POLLNVAL)) > 0) {
-            print(LOG_ERR "net: encountered error on socket (revents %d)", sockpoll->revents);
+        } else if((sockpoll->revents &
+                    (POLLRDHUP | POLLERR | POLLHUP | POLLNVAL)) > 0) {
+            print(LOG_ERR "net: encountered error on socket (revents %d)",
+                    sockpoll->revents);
             break;
         }
 
@@ -120,8 +116,10 @@ int net_subsystem(void)
             ws_send_heartbeat();
         }
     } while(poll(pollarray, 2, -1) >= 0);
+
     if(errno > 0) {
-        print(LOG_ERR "net: error encountered while polling (errno %d)", errno);
+        print(LOG_ERR "net: error encountered while polling"
+                " (errno %d)", errno);
     }
 
     free(inbuf);
@@ -135,6 +133,7 @@ int net_subsystem(void)
 
 void net_get_gateway_url()
 {
+    /* determine if websockets are supported */
     curl_version_info_data *curl_version =
         curl_version_info(CURLVERSION_NOW);
     const char * const* curl_protocols = curl_version->protocols;
@@ -149,6 +148,7 @@ void net_get_gateway_url()
     if(!wss_supported)
         panic("net: wss not supported by libcurl");
 
+    /* fetch preferred url from discord */
     int fd = http_get("https://discord.com/api/gateway/bot");
     if(fd < 0) {
         print(LOG_ERR "net: failed to get gateway url (error %d)", -fd);
@@ -170,6 +170,8 @@ void net_get_gateway_url()
         goto assume;
     }
 
+    /* curl requires websocket secure URLs to begin with WSS instead
+       of wss, so we fix up the received url for curl */
     gateway_url = calloc(strlen(gateway_url_json->valuestring) + 1,
             sizeof(char));
     strcpy(gateway_url, gateway_url_json->valuestring);
