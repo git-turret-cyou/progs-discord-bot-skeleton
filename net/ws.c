@@ -36,7 +36,7 @@ void ws_send_heartbeat()
 void ws_handle_event(cJSON *event)
 {
     int op = cJSON_GetObjectItem(event, "op")->valueint;
-    cJSON *data = cJSON_GetObjectItem(event, "d")
+    cJSON *data = cJSON_GetObjectItem(event, "d");
     switch(op) {
     case 1: /* Heartbeat request */
         ws_send_heartbeat();
