@@ -37,17 +37,20 @@ int net_subsystem(void)
     print(LOG_INFO "net: opening ws");
     CURLcode ret = curl_easy_perform(ws_handle);
 
-    if(ret > 0)
-        panic("net: cannot open websocket (curl errno %d)", ret);
+    if(ret > 0) {
+        panic("net: cannot open websocket: %s", curl_easy_strerror(ret));
+    }
 
     int ws_sockfd;
     if((ret = curl_easy_getinfo(ws_handle,
                     CURLINFO_ACTIVESOCKET, &ws_sockfd)) != CURLE_OK)
-        panic("net: curl cannot get active socket (errno %d)", ret);
+        panic("net: curl cannot get active socket: "
+                "%s", curl_easy_strerror(ret));
 
 
     /* Block ALRM */
     sigset_t *set = malloc(sizeof(sigset_t));
+    sigemptyset(set);
     sigaddset(set, SIGALRM);
     sigprocmask(SIG_BLOCK, set, NULL);
     int alrmfd = signalfd(-1, set, 0);
@@ -85,8 +88,8 @@ int net_subsystem(void)
             if(ret == CURLE_AGAIN)
                 continue;
             if(ret != CURLE_OK) {
-                print(LOG_ERR "net: encountered curl error while reading "
-                        "socket (curl errno %d)", ret);
+                print(LOG_ERR "net: encountered error while reading socket: "
+                        "%s", curl_easy_strerror(ret));
                 break;
             }
 
@@ -105,8 +108,6 @@ int net_subsystem(void)
             cJSON_Delete(event);
         } else if((sockpoll->revents &
                     (POLLRDHUP | POLLERR | POLLHUP | POLLNVAL)) > 0) {
-            print(LOG_ERR "net: encountered error on socket (revents %d)",
-                    sockpoll->revents);
             break;
         }
 
@@ -118,8 +119,7 @@ int net_subsystem(void)
     } while(poll(pollarray, 2, -1) >= 0);
 
     if(errno > 0) {
-        print(LOG_ERR "net: error encountered while polling"
-                " (errno %d)", errno);
+        print(LOG_ERR "net: poll: %s", strerror(errno));
     }
 
     free(inbuf);
@@ -151,7 +151,7 @@ void net_get_gateway_url()
     /* fetch preferred url from discord */
     int fd = http_get("https://discord.com/api/gateway/bot");
     if(fd < 0) {
-        print(LOG_ERR "net: failed to get gateway url (error %d)", -fd);
+        print(LOG_ERR "net: cannot get gateway url: %s", curl_easy_strerror(-fd));
         goto assume;
     }
 
@@ -164,8 +164,17 @@ void net_get_gateway_url()
         cJSON_GetObjectItemCaseSensitive(gateway_info, "url");
     if(!cJSON_IsString(gateway_url_json) ||
             gateway_url_json->valuestring == NULL) {
-        print(LOG_ERR "net: cannot get gateway url from api "
-                "(token invalid?)");
+
+        cJSON *gateway_message =
+            cJSON_GetObjectItemCaseSensitive(gateway_info, "message");
+
+        if(cJSON_IsString(gateway_message)) {
+            print(LOG_ERR "net: cannot get gateway url from api: "
+                    "%s", cJSON_GetStringValue(gateway_message));
+        } else {
+            print(LOG_ERR "net: cannot get gateway url from api "
+                    "(unknown error)");
+        }
         cJSON_Delete(gateway_info);
         goto assume;
     }
