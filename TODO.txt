@@ -1,18 +1,8 @@
 TODO:
 
-- Credentials/config system
- - fetch from SOMEWHERE
- - env? built-in? header? linked in as txt?
-
-- Discord API Abstraction
- - GET/POST/DELETE/WHATEVER api that you can send quick requests to the API
- already authenticated.
-
 - Discord Websockets
  - authentication
- - libcurl
  - reconnecting/resuming
- - heartbeat
 
 - Event Abstractor
 
@@ -21,10 +11,3 @@ TODO:
  in play
 
 - command registration API
-
-- Panic
- - Print tons of debug info
- - Levels:
-  - Oops (fake panic, no die)
-  - Respawn (respawns subsystem in case of nonfatal)
-  - Real panic (fatal error, kills all subsystems and destroys all)
