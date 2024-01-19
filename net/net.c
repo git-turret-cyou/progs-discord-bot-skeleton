@@ -23,8 +23,6 @@ char *gateway_url;
 
 int net_subsystem(void)
 {
-    print(LOG_INFO "net: starting net subsystem");
-
     if(!gateway_url)
         panic("net: gateway url invalid");
 
@@ -34,7 +32,6 @@ int net_subsystem(void)
     curl_easy_setopt(ws_handle, CURLOPT_URL, gateway_url);
     curl_easy_setopt(ws_handle, CURLOPT_CONNECT_ONLY, 2L);
 
-    print(LOG_INFO "net: opening ws");
     CURLcode ret = curl_easy_perform(ws_handle);
 
     if(ret > 0) {
@@ -170,10 +167,10 @@ void net_get_gateway_url()
 
         if(cJSON_IsString(gateway_message)) {
             print(LOG_ERR "net: cannot get gateway url from api: "
-                    "%s", cJSON_GetStringValue(gateway_message));
+                    "%s: assuming url", cJSON_GetStringValue(gateway_message));
         } else {
             print(LOG_ERR "net: cannot get gateway url from api "
-                    "(unknown error)");
+                    "(unknown error): assuming url");
         }
         cJSON_Delete(gateway_info);
         goto assume;
@@ -188,13 +185,10 @@ void net_get_gateway_url()
     gateway_url[1] = 'S';
     gateway_url[2] = 'S';
 
-    print(LOG_DEBUG "net: using gateway url %s", gateway_url);
-
     cJSON_Delete(gateway_info);
     return;
 
 assume:
-    print(LOG_DEBUG "net: assuming gateway url WSS://gateway.discord.gg");
     gateway_url = calloc(strlen("WSS://gateway.discord.gg") + 1,
             sizeof(char));
     strcpy(gateway_url, "WSS://gateway.discord.gg");

@@ -101,8 +101,6 @@ static void doenv(char *path)
 
         *divider = '\0';
         setenv(line, divider + 1, 0);
-        print(LOG_DEBUG "env: setting \"%s\" to \"%s\"",
-                line, divider + 1);
 
 nextline:
         offset += (eol - line) + 1;
@@ -114,7 +112,7 @@ nextline:
 
 int main(void)
 {
-    print("init: Hello world! Running " NAME " v" VERSION "!");
+    /* Hello, World! */
 
     /* set mainpid for the subsystem service so it is fully accessible
        during l1 */

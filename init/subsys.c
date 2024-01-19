@@ -45,9 +45,6 @@ static int __subsystem_entry(struct subsystem_info *info)
     static sigset_t set;
     sigprocmask(SIG_SETMASK, &set, NULL);
 
-    print(LOG_DEBUG "subsys: starting subsystem %s (%d)",
-            info->fn_name, getpid());
-
     int ret = info->fn();
 
     return ret;
@@ -85,9 +82,6 @@ int subsystem_handle_term(int pid)
         struct subsystem_info *subsystem = subsystems[i];
         if(!subsystem || subsystem->pid != pid)
             continue;
-
-        print(LOG_DEBUG "subsys: subsystem terminated %s (%d)",
-                subsystem->fn_name, pid);
 
         if(subsystem->mode == PANICMODE_RESPAWN
                 && subsystem->respawn_count < MAX_RESPAWN) {
