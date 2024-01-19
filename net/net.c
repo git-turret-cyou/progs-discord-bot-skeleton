@@ -11,11 +11,11 @@
 #include <cJSON.h>
 #include <curl/curl.h>
 
+#include <api.h>
 #include <init.h>
 #include <log.h>
 #include <subsys.h>
 
-extern int http_get(char *url);
 extern void ws_handle_event(cJSON *event);
 extern void ws_send_heartbeat();
 CURL *ws_handle;
@@ -149,7 +149,7 @@ void net_get_gateway_url()
         panic("net: wss not supported by libcurl");
 
     /* fetch preferred url from discord */
-    int fd = http_get("https://discord.com/api/gateway/bot");
+    int fd = api_get("/gateway/bot", NULL, NULL, 0);
     if(fd < 0) {
         print(LOG_ERR "net: cannot get gateway url: %s", curl_easy_strerror(-fd));
         goto assume;
