@@ -1,8 +1,11 @@
+#include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <curl/curl.h>
@@ -62,7 +65,52 @@ static void do_initcalls(void)
     }
 }
 
+static void doenv(char *path)
+{
+    int fd = open(path, O_RDONLY);
+    if(fd < 0)
+        return;
 
+    struct stat statbuf;
+    if(fstat(fd, &statbuf) < 0)
+        return;
+
+    char *file_mmap = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if(file_mmap == NULL)
+        return;
+
+    char *file = malloc(statbuf.st_size + 1);
+    file[statbuf.st_size + 1] = 0;
+    memcpy(file, file_mmap, statbuf.st_size);
+    munmap(file_mmap, statbuf.st_size);
+
+    int offset = 0;
+    while(1) {
+        char *line = &(file[offset]);
+        if(*line == '\0')
+            break;
+
+        char *eol = strchrnul(line, '\n');
+        *eol = '\0';
+        if(*line == '#')
+            goto nextline;
+
+        char *divider = strchr(line, '=');
+        if(divider == NULL)
+            goto nextline;
+
+        *divider = '\0';
+        setenv(line, divider + 1, 0);
+        print(LOG_DEBUG "env: setting \"%s\" to \"%s\"",
+                line, divider + 1);
+
+nextline:
+        offset += (eol - line) + 1;
+        continue;
+    }
+
+    free(file);
+}
 
 int main(void)
 {
@@ -88,6 +136,29 @@ int main(void)
     sigaddset(&set, SIGINT);
     sigaddset(&set, SIGTERM);
     sigprocmask(SIG_BLOCK, &set, NULL);
+
+    /* use .env files if present */
+    doenv(".env");
+
+    /* find directory of self and use env from there if it exists */
+    char *buf = calloc(PATH_MAX, sizeof(char));
+    ssize_t self_size = readlink("/proc/self/exe", buf, PATH_MAX);
+    if(self_size + strlen(".env") + 1 > PATH_MAX)
+        goto skip_self;
+
+    char *lastslash = strrchr(buf, '/');
+    *lastslash = '\0';
+
+    char *cwd = get_current_dir_name();
+    int cwd_is_exec_dir = strcmp(buf, cwd) == 0;
+    free(cwd);
+    if(cwd_is_exec_dir)
+        goto skip_self;
+
+    strcat(buf, "/.env");
+    doenv(buf);
+skip_self:
+    free(buf);
 
     /* fetch token */
     char *token_base = getenv("TOKEN");
