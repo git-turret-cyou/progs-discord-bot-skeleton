@@ -9,9 +9,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <config.h>
-#include <log.h>
-#include <util.h>
+#include <dbs/log.h>
+#include <dbs/util.h>
 
 #define MAX_SUBSYSTEMS 32
 #define MAX_RESPAWN 3
@@ -36,7 +35,7 @@ static int __subsystem_entry(struct subsystem_info *info)
        what we are looking at from a glance in a ps view or htop or
        whatever. */
     char *name = malloc(16 * sizeof(char));
-    snprintf(name, 16, NAME_SHORTHAND ": %s", info->fn_name);
+    snprintf(name, 16, "DBS: %s", info->fn_name);
     name[15] = '\0';
     prctl(PR_SET_NAME, name);
     free(name);

@@ -10,16 +10,14 @@
 
 #include <curl/curl.h>
 
-#include <config.h>
-#include <init.h>
-#include <log.h>
-#include <util.h>
+#include <dbs/init.h>
+#include <dbs/log.h>
+#include <dbs/util.h>
 
 extern int subsystem_handle_term(int pid);
 extern int subsystem_count;
 int mainpid = 0;
 long stack_size = 8192 * 512;
-char *token;
 
 /* For some reason, I get SIGSEGV'd when running because a random-ass
    byte was inserted where it isnt supposed to be. Added a safety byte
@@ -139,34 +137,26 @@ int main(void)
     doenv(".env");
 
     /* find directory of self and use env from there if it exists */
-    char *buf = calloc(PATH_MAX, sizeof(char));
-    ssize_t self_size = readlink("/proc/self/exe", buf, PATH_MAX);
-    if(self_size + strlen(".env") + 1 > PATH_MAX)
-        goto skip_self;
+    {
+        char *buf = calloc(PATH_MAX, sizeof(char));
+        ssize_t self_size = readlink("/proc/self/exe", buf, PATH_MAX);
+        if(self_size + strlen(".env") + 1 > PATH_MAX)
+            goto skip_self;
 
-    char *lastslash = strrchr(buf, '/');
-    *lastslash = '\0';
+        char *lastslash = strrchr(buf, '/');
+        *lastslash = '\0';
 
-    char *cwd = get_current_dir_name();
-    int cwd_is_exec_dir = strcmp(buf, cwd) == 0;
-    free(cwd);
-    if(cwd_is_exec_dir)
-        goto skip_self;
+        char *cwd = get_current_dir_name();
+        int cwd_is_exec_dir = strcmp(buf, cwd) == 0;
+        free(cwd);
+        if(cwd_is_exec_dir)
+            goto skip_self;
 
-    strcat(buf, "/.env");
-    doenv(buf);
+        strcat(buf, "/.env");
+        doenv(buf);
 skip_self:
-    free(buf);
-
-    /* fetch token */
-    char *token_base = getenv("TOKEN");
-    if(!token_base)
-        panic("init: cannot find TOKEN in env");
-
-    token = calloc(strlen(token_base) + strlen("Authorization: Bot ") + 1,
-            sizeof(char));
-    strcpy(token, "Authorization: Bot ");
-    strcat(token, token_base);
+        free(buf);
+    }
 
     /* init curl */
     if(curl_global_init(CURL_GLOBAL_DEFAULT))
@@ -175,7 +165,7 @@ skip_self:
     /* init random seed */
     srand(time(NULL));
 
-    /* Rest of the program.. */
+    /* Perform initcalls */
     do_initcalls();
 
     /* Reaper. Much like init. */

@@ -1,6 +1,5 @@
 #ifndef __API_H
 #define __API_H
-#define _Nullable
 
 typedef enum {
     HTTP_GET,
@@ -10,15 +9,11 @@ typedef enum {
     HTTP_PATCH
 } HTTPMethod;
 
-#ifndef __API_INTERNAL
-
 int http_request(HTTPMethod method, char *url,
-        struct curl_slist *_Nullable headers, char *writebuf, size_t bufsiz);
+        struct curl_slist *headers, char *writebuf, size_t bufsiz);
 
 int api_request(HTTPMethod method, char * url,
-        struct curl_slist *_Nullable headers, char *writebuf, size_t bufsiz);
-
-#endif
+        struct curl_slist *headers, char *writebuf, size_t bufsiz);
 
 #define http_get(...) http_request(HTTP_GET, __VA_ARGS__)
 #define http_post(...) http_request(HTTP_POST, __VA_ARGS__)

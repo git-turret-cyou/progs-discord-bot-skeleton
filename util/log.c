@@ -8,8 +8,9 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <log.h>
-#include <util.h>
+
+#include <dbs/log.h>
+#include <dbs/util.h>
 
 extern int subsystem_change_mode(int pid, char mode);
 extern char *subsystem_get_name(int pid);
