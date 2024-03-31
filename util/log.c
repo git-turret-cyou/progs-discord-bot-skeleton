@@ -78,10 +78,9 @@ static int vaprint(const char *fmt, va_list ap)
 
     /* we essentially print the user's raw input to its own buffer,
        later we will parse it and print out ANSI colors and what not */
-    char buf[512];
+    char *buf = malloc(1<<16);
 
-    vsnprintf(buf, 512, fmt, ap);
-    buf[512 - 1] = '\0';
+    vsnprintf(buf, 1<<16, fmt, ap);
 
     size_t colon = 0;
     if(parsecolon) {
