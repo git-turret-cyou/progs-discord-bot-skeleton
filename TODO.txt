@@ -4,10 +4,12 @@ TODO:
  - authentication
  - reconnecting/resuming
 
-- Event Abstractor
-
 - Name initcall levels
- - ill figure out a use for all of the levels once i actually get some work
- in play
+    l1: DBS internals initialisation
+    l2:
+    l3: event registration
+    l4: commands & other interactions
+    l5: subsystems start (websocket, events start, etc)
+
 
 - command registration API
