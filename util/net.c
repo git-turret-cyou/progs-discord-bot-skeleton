@@ -40,7 +40,7 @@ static struct {
 #undef E
 } ev_handlers;
 
-static CURL *ws_handle;
+CURL *ws_handle;
 static char *gateway_url;
 static char *token_header;
 
@@ -203,6 +203,10 @@ static void ws_handle_event(cJSON *event)
         int (*ev_handler)(cJSON *) = *ev_get_handler(ev);
         if(ev_handler != NULL) {
             ev_handler(data);
+        } else {
+            char *ev_payload = cJSON_Print(data);
+            print("ws: unhandled event %s (data below)\n%s", event, ev_payload);
+            free(ev_payload);
         }
         break;
     case 1: /* Heartbeat request */
@@ -217,9 +221,11 @@ static void ws_handle_event(cJSON *event)
             break;
         }
         /* FALLTHROUGH */
-    case 7: /* Reconnect */
+    case 7: ; /* Reconnect */
         /* TODO */
-        panic("ws: cannot reconnect to ws after failure (Not supported)");
+        char *msg = cJSON_Print(data);
+        panic("ws: cannot reconnect to ws after failure (Not supported)\n%s", msg);
+        free(msg); /* at least the effort is there (not a memory leak) */
         break;
     case 10: ; /* Hello */
         int heartbeat_wait = cJSON_GetObjectItem(data,
