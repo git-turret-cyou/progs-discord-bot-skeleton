@@ -12,6 +12,7 @@
 #include <curl/curl.h>
 
 #include <dbs/api.h>
+#include <dbs/event.h>
 #include <dbs/init.h>
 #include <dbs/log.h>
 #include <dbs/subsys.h>
@@ -23,6 +24,9 @@ int api_request(HTTPMethod method, char *url,
         struct curl_slist *headers, char *writebuf, size_t bufsiz);
 static void setup_token_header();
 
+static int (**ev_get_handler(enum Event event)) (cJSON *);
+int ev_set_handler(enum Event event, int (*ev_handler)(cJSON*));
+
 static void ws_send_heartbeat();
 static void ws_handle_event(cJSON *event);
 
@@ -30,6 +34,12 @@ int net_subsystem();
 void net_get_gateway_url();
 
 /* variables */
+static struct {
+#define E(_, ev_name) int (*ev_name)(cJSON *);
+#include <dbs/bits/events.h>
+#undef E
+} ev_handlers;
+
 static CURL *ws_handle;
 static char *gateway_url;
 static char *token_header;
@@ -127,6 +137,27 @@ int api_request(HTTPMethod method, char *url,
     return ret;
 }
 
+/* returns the pointer of the function pointer in the ev_handlers struct */
+static int (**ev_get_handler(enum Event event)) (cJSON *)
+{
+    switch(event) {
+#define E(ev_enum, ev_func) \
+    case ev_enum: \
+        return &(ev_handlers.ev_func);
+#include <dbs/bits/events.h>
+#undef E
+    default:
+        return &(ev_handlers.event_invalid);
+    }
+}
+
+int ev_set_handler(enum Event event, int (*ev_handler)(cJSON*))
+{
+    int (**ev_pointer)(cJSON*) = ev_get_handler(event);
+    *ev_pointer = ev_handler;
+    return 0;
+}
+
 static void ws_send_heartbeat()
 {
     char buf[128] = "{\"op\":1,\"d\":null}";
@@ -152,7 +183,27 @@ static void ws_handle_event(cJSON *event)
     int op = cJSON_GetObjectItem(event, "op")->valueint;
     cJSON *data = cJSON_GetObjectItem(event, "d");
     switch(op) {
-    case 0: /* Event dispatch */
+    case 0: ; /* Event dispatch */
+        cJSON *ev_name = cJSON_GetObjectItem(event, "t");
+        if(!cJSON_IsString(ev_name)) {
+            print(LOG_ERR "ws: malformed event dispatch (t not a string)");
+            break;
+        }
+
+        char *event = ev_name->valuestring;
+        enum Event ev;
+#define E(ev_name, _) \
+        if (strcmp(event, #ev_name ) == 0) { \
+            ev = ev_name; \
+        } else
+#include <dbs/bits/events.h>
+#undef E
+               { ev = EVENT_INVALID; }
+
+        int (*ev_handler)(cJSON *) = *ev_get_handler(ev);
+        if(ev_handler != NULL) {
+            ev_handler(data);
+        }
         break;
     case 1: /* Heartbeat request */
         ws_send_heartbeat();
@@ -168,7 +219,7 @@ static void ws_handle_event(cJSON *event)
         /* FALLTHROUGH */
     case 7: /* Reconnect */
         /* TODO */
-        panic("ws: cannot reconnect to ws after failure");
+        panic("ws: cannot reconnect to ws after failure (Not supported)");
         break;
     case 10: ; /* Hello */
         int heartbeat_wait = cJSON_GetObjectItem(data,
@@ -186,6 +237,12 @@ static void ws_handle_event(cJSON *event)
             .it_value = jitter_time
         };
         setitimer(ITIMER_REAL, &new_itimer, NULL);
+
+        int (*hello_handler)(cJSON *) = *ev_get_handler(HELLO);
+        if(hello_handler) {
+            (hello_handler)(data);
+        }
+
         break;
     case 11: /* Heartbeat ACK */
         print(LOG_DEBUG "ws: heartbeat ACK");
