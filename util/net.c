@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/signalfd.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <cJSON.h>
@@ -19,9 +20,11 @@
 
 /* functions */
 int http_request(HTTPMethod method, char *url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz);
+        struct curl_slist *headers, char *writebuf,
+        long *response_code);
 int api_request(HTTPMethod method, char *url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz);
+        struct curl_slist *headers, char *writebuf,
+        long *response_code);
 static void setup_token_header();
 
 static int (**ev_get_handler(enum Event event)) (cJSON *);
@@ -44,25 +47,22 @@ CURL *ws_handle;
 static char *gateway_url;
 static char *token_header;
 
+static struct timeval last_heartbeat_sent;
+double api_latency;
+
 static long last_sequence = -1;
 static struct timeval heartbeat_time;
 
 int http_request(HTTPMethod method, char *url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz)
+        struct curl_slist *headers, char *writebuf,
+        long *response_code)
 {
-    int inputpipe[2];
+    /* TODO: async */
     int outputpipe[2];
 
-    if(pipe(inputpipe) < 0)
-        return -(errno << 8);
     if(pipe(outputpipe) < 0)
         return -(errno << 8);
 
-    if(writebuf && bufsiz > 0)
-        write(inputpipe[1], writebuf, bufsiz);
-    close(inputpipe[1]);
-
-    FILE *input_read = fdopen(inputpipe[0], "r");
     FILE *output_write = fdopen(outputpipe[1], "w");
 
     int ret = outputpipe[0];
@@ -72,7 +72,6 @@ int http_request(HTTPMethod method, char *url,
         panic("api: curl_easy_init failed");
 
     curl_easy_setopt(job, CURLOPT_URL, url);
-    curl_easy_setopt(job, CURLOPT_READDATA, input_read);
     curl_easy_setopt(job, CURLOPT_WRITEDATA, output_write);
     char *requestmethod = "GET";
     switch(method) {
@@ -93,6 +92,9 @@ int http_request(HTTPMethod method, char *url,
         break;
     }
     curl_easy_setopt(job, CURLOPT_CUSTOMREQUEST, requestmethod);
+    if(method != HTTP_GET && writebuf != NULL) {
+        curl_easy_setopt(job, CURLOPT_POSTFIELDS, writebuf);
+    }
     if(headers)
         curl_easy_setopt(job, CURLOPT_HTTPHEADER, headers);
     CURLcode res = curl_easy_perform(job);
@@ -102,8 +104,11 @@ int http_request(HTTPMethod method, char *url,
         ret = -res;
     }
 
+    if(response_code != NULL) {
+        curl_easy_getinfo(job, CURLINFO_RESPONSE_CODE, response_code);
+    }
+
     curl_easy_cleanup(job);
-    fclose(input_read);
     fclose(output_write);
     return ret;
 }
@@ -122,7 +127,8 @@ static void setup_token_header()
 l1_initcall(setup_token_header);
 
 int api_request(HTTPMethod method, char *url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz)
+        struct curl_slist *headers, char *writebuf,
+        long *response_code)
 {
     char *new_url = calloc((strlen("https://discord.com/api") + strlen(url) + 1),
             sizeof(char));
@@ -131,7 +137,7 @@ int api_request(HTTPMethod method, char *url,
     if(token_header == NULL)
         setup_token_header();
     struct curl_slist *headers_auth = curl_slist_append(headers, token_header);
-    int ret = http_request(method, new_url, headers_auth, writebuf, bufsiz);
+    int ret = http_request(method, new_url, headers_auth, writebuf, response_code);
     free(new_url);
     curl_slist_free_all(headers_auth);
     return ret;
@@ -176,11 +182,14 @@ static void ws_send_heartbeat()
         itimer.it_value = heartbeat_time;
         setitimer(ITIMER_REAL, &itimer, NULL);
     }
+
+    gettimeofday(&last_heartbeat_sent, NULL);
 }
 
 static void ws_handle_event(cJSON *event)
 {
     int op = cJSON_GetObjectItem(event, "op")->valueint;
+    char *msg;
     cJSON *data = cJSON_GetObjectItem(event, "d");
     switch(op) {
     case 0: ; /* Event dispatch */
@@ -201,6 +210,7 @@ static void ws_handle_event(cJSON *event)
                { ev = EVENT_INVALID; }
 
         int (*ev_handler)(cJSON *) = *ev_get_handler(ev);
+        /* TODO: intercept ready event for session information */
         if(ev_handler != NULL) {
             ev_handler(data);
         } else {
@@ -223,11 +233,12 @@ static void ws_handle_event(cJSON *event)
         /* FALLTHROUGH */
     case 7: ; /* Reconnect */
         /* TODO */
-        char *msg = cJSON_Print(data);
+        msg = cJSON_Print(data);
         panic("ws: cannot reconnect to ws after failure (Not supported)\n%s", msg);
         free(msg); /* at least the effort is there (not a memory leak) */
         break;
     case 10: ; /* Hello */
+        /* Establish heartbeat interval*/
         int heartbeat_wait = cJSON_GetObjectItem(data,
                 "heartbeat_interval")->valueint;
         float jitter = (float)rand() / (RAND_MAX * 1.0f);
@@ -244,17 +255,81 @@ static void ws_handle_event(cJSON *event)
         };
         setitimer(ITIMER_REAL, &new_itimer, NULL);
 
+        /* Send IDENT */
+        /* TODO: resume functionality */
+        cJSON *ev_payload = cJSON_CreateObject();
+        cJSON *ev_data = cJSON_CreateObject();
+        cJSON_AddNumberToObject(ev_payload, "op", 2);
+        cJSON_AddItemToObject(ev_payload, "d", ev_data);
+
+        cJSON_AddStringToObject(ev_data, "token", getenv("TOKEN"));
+        cJSON_AddNumberToObject(ev_data, "intents", 0);
+
+        cJSON *properties = cJSON_CreateObject();
+        cJSON_AddItemToObject(ev_data, "properties", properties);
+        cJSON_AddStringToObject(properties, "browser", "DBS");
+        cJSON_AddStringToObject(properties, "device", "DBS");
+
+        struct utsname unamed;
+        uname(&unamed);
+        cJSON_AddStringToObject(properties, "os", unamed.sysname);
+
+        msg = cJSON_PrintUnformatted(ev_payload);
+        size_t sent;
+        curl_ws_send(ws_handle, msg, strlen(msg), &sent, 0, CURLWS_TEXT);
+        free(msg);
+        cJSON_Delete(ev_payload);
+        print(LOG_DEBUG "hello: sent IDENT");
+
+        /* Call user hello handler */
         int (*hello_handler)(cJSON *) = *ev_get_handler(HELLO);
         if(hello_handler) {
             (hello_handler)(data);
         }
 
         break;
-    case 11: /* Heartbeat ACK */
-        print(LOG_DEBUG "ws: heartbeat ACK");
+    case 11: ; /* Heartbeat ACK */
+        // last_heartbeat_sent
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        api_latency = (now.tv_sec - last_heartbeat_sent.tv_sec) * 1000.0f
+            + (now.tv_usec - last_heartbeat_sent.tv_usec) / 1000.0f;
+        print(LOG_DEBUG "ws: heartbeat ACK (latency %.4f)", api_latency);
+
         break;
     default:
         print(LOG_ERR "ws: received unknown WS opcode %d", op);
+        break;
+    }
+}
+
+static void ws_handle_close(short code, char *msg) {
+    switch(code){
+    case 4003: /* Not authenticated */
+    case 4007: /* Invalid seq */
+    case 4009: /* Session timed out */
+        /* Reconnect is allowed, however our previous session has been invalidated,
+           so we need to create a new session */
+        panic("ws code %d: %s", code, msg);
+        break;
+        /* TODO: handle new session reconnect */
+
+    case 4004: /* Authentication failed */
+    case 4010: /* Invalid shard */
+    case 4011: /* Sharding required */
+    case 4012: /* Invalid API version */
+    case 4013: /* Invalid intent(s) */
+    case 4014: /* Disallowed intent(s) */
+        /* We should not try to reconnect! These are issues either
+           with DBS or with configuration and need to be resolved manually. */
+        panic("ws code %d: %s", code, msg);
+        break;
+
+    default:
+        /* All other codes have us reconnect, reusing our established session so
+           data is not lost */
+        panic("ws code %d: %s", code, msg);
+        /* TODO: handle session reuse reconnect */
         break;
     }
 }
@@ -283,6 +358,7 @@ int net_subsystem(void)
                 "%s", curl_easy_strerror(ret));
 
 
+    /* TODO: catch sigterm & terminate session */
     /* Block ALRM */
     sigset_t *set = malloc(sizeof(sigset_t));
     sigemptyset(set);
@@ -338,13 +414,19 @@ int net_subsystem(void)
             case(CURLWS_PING):
                 curl_ws_send(ws_handle, NULL, 0, NULL, 0, CURLWS_PONG);
                 goto sockpoll_continue;
-            case(CURLWS_CLOSE):
+            case(CURLWS_CLOSE):;
+                short code = (uint8_t)inbuf[1] | (uint8_t)inbuf[0] << 8;
+                char *msg = (char*)((void*)inbuf + 2);
+                inbuf[rlen] = '\0';
+                ws_handle_close(code, msg);
+                goto sockpoll_continue;
             default:
                 break;
             }
 
             cJSON *event = cJSON_ParseWithLength(inbuf, rlen);
             if(!event) {
+                fwrite(inbuf, rlen, sizeof(char), stdout);
                 print(LOG_ERR "net: dropped malformed frame");
                 goto sockpoll_continue;
             }
@@ -395,10 +477,22 @@ void net_get_gateway_url()
         panic("net: wss not supported by libcurl");
 
     /* fetch preferred url from discord */
-    int fd = api_get("/gateway/bot", NULL, NULL, 0);
+    long response_code;
+    int fd = api_get("/gateway/bot", NULL, NULL, &response_code);
     if(fd < 0) {
         print(LOG_ERR "net: cannot get gateway url: %s", curl_easy_strerror(-fd));
         goto assume;
+    }
+
+    if(response_code != 200) {
+        switch(response_code){
+        case 401:
+            panic("net: token is invalid, please use a valid token");
+            break;
+        default:
+            panic("net: received non-OK status while asking for url (code %d)", response_code);
+            break;
+        }
     }
 
     char buf[512];

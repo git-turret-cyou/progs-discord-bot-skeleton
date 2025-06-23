@@ -7,35 +7,32 @@
 
 #include <dbs/event.h>
 #include <dbs/log.h>
+#include <dbs/util.h>
 
 extern CURL *ws_handle;
+char *app_id;
 
 int hello(cJSON *data)
 {
-    cJSON *ev_payload = cJSON_CreateObject();
-    cJSON *ev_data = cJSON_CreateObject();
-    cJSON_AddNumberToObject(ev_payload, "op", 2);
-    cJSON_AddItemToObject(ev_payload, "d", ev_data);
-
-    cJSON_AddStringToObject(ev_data, "token", getenv("TOKEN"));
-    cJSON_AddNumberToObject(ev_data, "intents", 0);
-
-    cJSON *properties = cJSON_CreateObject();
-    cJSON_AddItemToObject(ev_data, "properties", properties);
-    cJSON_AddStringToObject(properties, "browser", "DBS");
-    cJSON_AddStringToObject(properties, "device", "DBS");
-
-    struct utsname unamed;
-    uname(&unamed);
-    cJSON_AddStringToObject(properties, "os", unamed.sysname);
-
-    char *msg = cJSON_PrintUnformatted(ev_payload);
-    size_t sent;
-    curl_ws_send(ws_handle, msg, strlen(msg), &sent, 0, CURLWS_TEXT);
-    free(msg);
-    cJSON_Delete(ev_payload);
-    print("hello: sent IDENT");
+    print("hello: hello from userland!");
 
     return 0;
 }
 declare_event(HELLO, hello);
+
+int ready(cJSON *data)
+{
+    print("hello: received ready event!");
+
+    cJSON *app = cJSON_GetObjectItemCaseSensitive(data, "application");
+    char *id = js_getStr(app, "id");
+    app_id = malloc(strlen(id) + 1);
+    strcpy(app_id, id);
+
+    cJSON *user = cJSON_GetObjectItemCaseSensitive(data, "user");
+    char *username = js_getStr(user, "username");
+    print("hello: logged in! my name is %s (id %s)", username, app_id);
+
+    return 0;
+}
+declare_event(READY, ready);

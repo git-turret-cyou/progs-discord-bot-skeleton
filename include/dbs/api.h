@@ -10,10 +10,12 @@ typedef enum {
 } HTTPMethod;
 
 int http_request(HTTPMethod method, char *url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz);
+        struct curl_slist *headers, char *writebuf,
+        long *response_code);
 
-int api_request(HTTPMethod method, char * url,
-        struct curl_slist *headers, char *writebuf, size_t bufsiz);
+int api_request(HTTPMethod method, char *url,
+        struct curl_slist *headers, char *writebuf,
+        long *response_code);
 
 #define http_get(...) http_request(HTTP_GET, __VA_ARGS__)
 #define http_post(...) http_request(HTTP_POST, __VA_ARGS__)
