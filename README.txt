@@ -15,4 +15,12 @@ an issue or email me directly (will likely be placed on the issue tracker)
 (turret@duck.com)
 
 - using
-IDK! wait for release ig..
+take a look in the example/ folder!
+with the way the skeleton's build system is setup, all of the example files are added
+you can set TOKEN= in your environment or write a .env file with your token in it and
+the system will login as that bot and register all of the commands in the examples.
+
+additionally, we try to keep all of the examples independent. you can add and remove files
+dictating commands without editing any other file! gotta love magic.
+
+
