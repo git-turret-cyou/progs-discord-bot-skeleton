@@ -426,7 +426,6 @@ int net_subsystem(void)
 
             cJSON *event = cJSON_ParseWithLength(inbuf, rlen);
             if(!event) {
-                fwrite(inbuf, rlen, sizeof(char), stdout);
                 print(LOG_ERR "net: dropped malformed frame");
                 goto sockpoll_continue;
             }
