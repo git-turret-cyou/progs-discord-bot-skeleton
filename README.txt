@@ -23,4 +23,8 @@ the system will login as that bot and register all of the commands in the exampl
 additionally, we try to keep all of the examples independent. you can add and remove files
 dictating commands without editing any other file! gotta love magic.
 
-
+- portability
+At current time of development, this project is for linux machines with amd64 processors.
+Most of the kernel-specific code is in util/subsys (threading functionality)
+And most of the amd64 specific content is in util/log (assembly spinlock) with a linker file
+written for amd64
