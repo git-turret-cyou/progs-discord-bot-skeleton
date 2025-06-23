@@ -186,6 +186,7 @@ skip_self:
             }
             break;
         case SIGINT:
+            /* TODO: close websocket to invalidate session */
             panic("init: keyboard interrupt");
             break;
         case SIGTERM:
