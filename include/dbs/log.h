@@ -18,6 +18,7 @@
 #define LOG_CRIT LOG_SOH "\1" "2"
 #define LOG_ERR LOG_SOH "\1" "3"
 #define LOG_WARNING LOG_SOH "\1" "4"
+#define LOG_WARN LOG_WARNING
 #define LOG_NOTICE LOG_SOH "\1" "5"
 #define LOG_INFO LOG_SOH "\1" "6"
 #define LOG_DEBUG LOG_SOH "\1" "7"
