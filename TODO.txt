@@ -19,3 +19,7 @@ there are todos embedded in the code :steamhappy:
 
 - Redo logging (unnecessarily complex?)
 - Add define to enable/disable built-in logging?
+
+- program portability
+   (processor portability? maybe)
+   (os kernel portability? most likely not)
