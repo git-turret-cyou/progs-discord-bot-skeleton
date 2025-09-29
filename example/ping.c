@@ -4,8 +4,11 @@
 
 #include <curl/curl.h>
 #include <cJSON.h>
+#include <stb_ds.h>
 
+#include <dbs/abstract.h>
 #include <dbs/api.h>
+#include <dbs/commands.h>
 #include <dbs/event.h>
 #include <dbs/init.h>
 #include <dbs/log.h>
@@ -14,57 +17,45 @@
 extern char *app_id;
 extern double api_latency;
 
-static void ping(cJSON *i)
+Command ping_command = {
+    .type = COMMAND_CHAT_INPUT,
+    .name = "ping",
+    .description = "ping pong all the way to america :flag_us:",
+    .options = NULL
+};
+void ping(cJSON *i)
 {
-    struct curl_slist *headers = curl_slist_append(NULL, "Content-type: application/json");
-    headers = curl_slist_append(headers, "User-Agent: DiscordBot (DBS, dev)");
-
-    char *i_id = js_getStr(i, "id");
-    char *i_token = js_getStr(i, "token");
-    char *url = malloc(strlen("/interactions/") + strlen(i_id) + strlen("/") + strlen(i_token) + strlen("/messages/@original") + 2);
-
-    sprintf(url, "/interactions/%s/%s/callback", i_id, i_token);
-    char *defer_message = "{\"type\":5}";
-
+    static int do_hidden = 1;
     struct timeval sent;
     struct timeval done;
-
-    long code;
     gettimeofday(&sent, NULL);
-    close(api_post(url, headers, defer_message, &code));
+    if(!interaction_defer_reply(i, do_hidden))
+        print("ping: DEFER failed");
+    do_hidden = !do_hidden;
     gettimeofday(&done, NULL);
 
     char *response = malloc(128);
     snprintf(response, 128, "{\"embeds\":[{\"title\": \"PONG!\", \"description\": \"Measured API Latency: %.4fms\\nWS Latency: %.4fms\"}]}",
             (done.tv_sec - sent.tv_sec) * 1000.0f + (done.tv_usec - sent.tv_usec) / 1000.0f,
             api_latency);
-    sprintf(url, "/webhooks/%s/%s/messages/@original", app_id, i_token);
-    headers = curl_slist_append(NULL, "Content-type: application/json");
-    headers = curl_slist_append(headers, "User-Agent: DiscordBot (DBS, dev)");
-
-    close(api_patch(url, headers, response, &code));
-
+    if(!interaction_edit_reply(i, response, 1))
+        print("ping: EDIT failed");
     free(response);
-    free(url);
 }
+declare_command(ping);
 
+Command hi_command = {
+    .type = COMMAND_CHAT_INPUT,
+    .name = "hi",
+    .description = "hallo!!!!",
+    .options = NULL
+};
 static void hi(cJSON *i)
 {
-
-    char *i_id = js_getStr(i, "id");
-    char *i_token = js_getStr(i, "token");
-    char *url = malloc(strlen("/interactions/") + strlen(i_id) + strlen("/") + strlen(i_token) + strlen("/callback") + 2);
-    sprintf(url, "/interactions/%s/%s/callback", i_id, i_token);
-
-    char *message = "{\"type\": 4,\"data\":{\"type\":4,\"flags\": 0,\"content\":\"hello world!\"}}";
-    long code;
-
-    struct curl_slist *headers = curl_slist_append(NULL, "Content-type: application/json");
-    headers = curl_slist_append(headers, "User-Agent: DiscordBot (DBS, dev)");
-    close(api_post(url, headers, message, &code));
-
-    free(url);
+    if(!interaction_reply(i, "hello world!", 0))
+        print("hi: REPLY failed");
 }
+declare_command(hi);
 
 int interaction_create(cJSON *ev_data)
 {
@@ -75,16 +66,14 @@ int interaction_create(cJSON *ev_data)
     case 1: ; /* PING */
         break;
     case 2: ; /* APPLICATION_COMMAND */
-        int cmd_type = js_getInt(i, "type");
-        if(cmd_type == -1) cmd_type = 1;
         char *cmd_name = js_getStr(i, "name");
-        if(strcmp(cmd_name, "ping") == 0) {
-            ping(ev_data);
-            return 0;
-        } else if(strcmp(cmd_name, "hi") == 0) {
-            hi(ev_data);
-            return 0;
+        for(int i = 0; i < arrlen(commands); ++i) {
+            if(strcmp(cmd_name, commands[i].name) == 0) {
+                commands[i].callback(ev_data);
+                return 0;
+            }
         }
+        print(LOG_WARN "commands: unknown command %s", cmd_name);
         break;
     case 3: ; /* MESSAGE_COMPONENT */
         break;
