@@ -416,7 +416,7 @@ int net_subsystem(void)
                 goto sockpoll_continue;
             case(CURLWS_CLOSE):;
                 short code = (uint8_t)inbuf[1] | (uint8_t)inbuf[0] << 8;
-                char *msg = (char*)((void*)inbuf + 2);
+                char *msg = (char*)((long long)inbuf + 2);
                 inbuf[rlen] = '\0';
                 ws_handle_close(code, msg);
                 goto sockpoll_continue;

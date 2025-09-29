@@ -14,6 +14,7 @@ char *app_id;
 
 int hello(cJSON *data)
 {
+    (void)(data);
     print("hello: hello from userland!");
 
     return 0;
