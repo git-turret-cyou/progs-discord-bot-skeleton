@@ -11,8 +11,8 @@ there are todos embedded in the code :steamhappy:
 - Name initcall levels
     l1: DBS internals initialisation
     l2:
-    l3: event registration
-    l4: commands & other interactions
+    l3: event registration, commands declaration
+    l4: commands & other interactions registration
     l5: subsystems start (websocket, events start, etc)
 
 - command registration API
@@ -21,5 +21,15 @@ there are todos embedded in the code :steamhappy:
 - Add define to enable/disable built-in logging?
 
 - program portability
-   (processor portability? maybe)
-   (os kernel portability? most likely not)
+  - use pthreads
+  - use mutex
+  - use pselect instead of signalfd for subsys
+  - many more.....
+  - its easier to make it more portable in c11
+  - consider c11
+
+- find portable solution for initcalls
+- either that.. or change makefile to see processor and switch linker script dynamically
+    (ie for arm processors with cheap oracle vm or smthn)
+
+
