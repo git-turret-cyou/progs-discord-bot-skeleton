@@ -137,9 +137,9 @@ int api_request(HTTPMethod method, char *url,
     if(token_header == NULL)
         setup_token_header();
     struct curl_slist *headers_auth = curl_slist_append(headers, token_header);
+    curl_slist_append(headers_auth, "User-Agent: DiscordBot (DBS, dev)");
     int ret = http_request(method, new_url, headers_auth, writebuf, response_code);
     free(new_url);
-    curl_slist_free_all(headers_auth);
     return ret;
 }
 
@@ -190,6 +190,7 @@ static void ws_handle_event(cJSON *event)
 {
     int op = cJSON_GetObjectItem(event, "op")->valueint;
     char *msg;
+    struct timeval now;
     cJSON *data = cJSON_GetObjectItem(event, "d");
     switch(op) {
     case 0: ; /* Event dispatch */
@@ -208,6 +209,13 @@ static void ws_handle_event(cJSON *event)
 #include <dbs/bits/events.h>
 #undef E
                { ev = EVENT_INVALID; }
+
+        if(ev == READY) {
+            gettimeofday(&now, NULL);
+            api_latency = (now.tv_sec - last_heartbeat_sent.tv_sec) * 1000.0f
+                + (now.tv_usec - last_heartbeat_sent.tv_usec) / 1000.0f;
+            print(LOG_DEBUG "ws: READY rcvd (latency %.4f)", api_latency);
+        }
 
         int (*ev_handler)(cJSON *) = *ev_get_handler(ev);
         /* TODO: intercept ready event for session information */
@@ -277,6 +285,7 @@ static void ws_handle_event(cJSON *event)
         msg = cJSON_PrintUnformatted(ev_payload);
         size_t sent;
         curl_ws_send(ws_handle, msg, strlen(msg), &sent, 0, CURLWS_TEXT);
+        gettimeofday(&last_heartbeat_sent, NULL);
         free(msg);
         cJSON_Delete(ev_payload);
         print(LOG_DEBUG "hello: sent IDENT");
@@ -290,7 +299,6 @@ static void ws_handle_event(cJSON *event)
         break;
     case 11: ; /* Heartbeat ACK */
         // last_heartbeat_sent
-        struct timeval now;
         gettimeofday(&now, NULL);
         api_latency = (now.tv_sec - last_heartbeat_sent.tv_sec) * 1000.0f
             + (now.tv_usec - last_heartbeat_sent.tv_usec) / 1000.0f;
