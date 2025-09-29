@@ -27,6 +27,8 @@ there are todos embedded in the code :steamhappy:
   - many more.....
   - its easier to make it more portable in c11
   - consider c11
+  - use posix files instead of bare fds
+  - (incl weird pipe system for http requests)
 
 - find portable solution for initcalls
 - either that.. or change makefile to see processor and switch linker script dynamically
